@@ -1,9 +1,6 @@
 name: Lint and Tag
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
