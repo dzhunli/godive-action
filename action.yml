@@ -1,6 +1,4 @@
----
-
-name: "Dive CI Analysis"
+iname: "Dive CI Analysis"
 description: "Analyzes Docker images using Dive with CI configuration support and size validation"
 inputs:
   image_name:
@@ -23,8 +21,12 @@ runs:
     - name: Checkout action repository
       uses: actions/checkout@v4
       with:
-          repository: dzhunli/image-analytics
+        repository: dzhunli/image-analytics
     - run: |
         chmod +x src/main.sh
-        src/main.sh "${{ inputs.image_name }}" "${{ inputs.ci_config }}" "${{ inputs.allow_large_image }}" "${{ inputs.continue_on_fail }}"
+        src/main.sh "${{ inputs.image_name }}" \
+          "${{ inputs.ci_config }}" \
+          "${{ inputs.allow_large_image }}" \
+          "${{ inputs.continue_on_fail }}"
       shell: bash
+
