@@ -1,0 +1,38 @@
+name: Tag and Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: yaml-lint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: ./action.yml
+  tag:
+    needs: lint
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - uses: actions/checkout@v3
+      - name: Get the latest TAG
+        id: get_latest_tag
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0)
+          if [[ -z "$LAST_TAG" ]]; then
+            LAST_TAG="v0"
+          fi
+          echo "Latest tag is $LAST_TAG"
+          echo "LAST_TAG=$LAST_TAG" >> $GITHUB_ENV
+      - name: Create a new TAG
+        run: |
+          TAG_NUMBER=$(echo ${LAST_TAG//v/} | awk '{print $1+1}')
+          NEW_TAG="v$TAG_NUMBER"
+          git tag $NEW_TAG
+          git push origin $NEW_TAG

@@ -18,9 +18,9 @@ check_image_size() {
         if [[ "$ALLOW_LARGE_IMAGE" != "true" ]]; then
 	        echo -e "\033[1;31m Error: The image size exceeds 1 GB. \033[0m"
 		echo -e "\n\n"
-		echo "#		Pass 'allow_large_image=true' to proceed.	 #"
+		echo "#		Pass 'allow_large_image=true' to proceed."
 		if [[ "$CONTINUE_ON_FAIL" = "true" ]]; then
-        		echo "#         Pass 'continue_on_fail=false' to fail actions that don't pass the test.        #"
+        		echo "#         Pass 'continue_on_fail=false' to fail actions that don't pass the test."
 			echo -e "\033[1;33m CONTINUE POLICY ENABLED... \033[0m"
 			exit 0
 		else
@@ -49,7 +49,7 @@ echo -e "\033[1;33m Running Dive analysis on image: $IMAGE_NAME with CI config: 
 if [[ "$CONTINUE_ON_FAIL" = "true" ]]; then
 	CI=true dive --ci-config "$CI_CONFIG" "$IMAGE_NAME" || echo -e "\033[1;33m CONTINUE POLICY ENABLED... \033[0m"
 	echo -e "\n\n"
-	echo "#         Pass 'continue_on_fail=false' to fail actions that don't pass the test.        #"
+	echo "#         Pass 'continue_on_fail=false' to fail actions that don't pass the test."
 else
 	CI=true dive --ci-config "$CI_CONFIG" "$IMAGE_NAME"
 fi
