@@ -1,5 +1,5 @@
 iname: "Dive CI Analysis"
-description: "Analyzes Docker images using Dive with CI configuration support and size validation"
+description: "Analyzes Docker images using Dive with CI"
 inputs:
   image_name:
     description: "Docker image name"
@@ -29,4 +29,3 @@ runs:
           "${{ inputs.allow_large_image }}" \
           "${{ inputs.continue_on_fail }}"
       shell: bash
-
