@@ -20,7 +20,7 @@ jobs:
           yamllint_strict: false
           yamllint_comment: false
   tag:
-    needs: lint
+    needs: yamllint
     runs-on: ubuntu-latest
     if: success()
     steps:
