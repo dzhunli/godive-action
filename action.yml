@@ -16,6 +16,8 @@ runs:
   steps:
     - name: Checkout action repository
       uses: actions/checkout@v4
+        with:
+          repository: dzhunli/image-analytics
     - run: |
         pwd
         ls -lah
