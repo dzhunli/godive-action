@@ -11,6 +11,10 @@ inputs:
     description: "Set to true if the image size exceeds 1 GB"
     required: false
     default: "false"
+  continue_on_fail:
+    description: "Set false to fail launches that don't pass the test."
+    required: false
+    default: "true"
 runs:
   using: "composite"
   steps:
@@ -20,5 +24,5 @@ runs:
           repository: dzhunli/image-analytics
     - run: |
         chmod +x src/main.sh
-        src/main.sh "${{ inputs.image_name }}" "${{ inputs.ci_config }}" "${{ inputs.allow_large_image }}"
+        src/main.sh "${{ inputs.image_name }}" "${{ inputs.ci_config }}" "${{ inputs.allow_large_image }}" "${{ inputs.continue_on_fail }}"
       shell: bash
