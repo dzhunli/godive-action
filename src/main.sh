@@ -19,7 +19,13 @@ check_image_size() {
 	        echo -e "\033[1;31m Error: The image size exceeds 1 GB. \033[0m"
 		echo -e "\n\n"
 		echo "#		Pass 'allow_large_image=true' to proceed.	 #"
-		exit 1
+		if [[ "$CONTINUE_ON_FAIL" = "true" ]]; then
+        		echo "#         Pass 'continue_on_fail=false' to fail actions that don't pass the test.        #"
+			echo -e "\033[1;33m CONTINUE POLICY ENABLED... \033[0m"
+			exit 0
+		else
+			exit 1
+		fi
 	else
 	        echo -e "\033[1;32m Large image allowed. Continuing... \033[0m"
 	fi
