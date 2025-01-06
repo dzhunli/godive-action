@@ -1,3 +1,5 @@
+---
+
 name: "Dive CI Analysis"
 description: "Analyzes Docker images using Dive with CI configuration support and size validation"
 inputs:
