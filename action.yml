@@ -19,8 +19,6 @@ runs:
       with:
           repository: dzhunli/image-analytics
     - run: |
-        pwd
-        ls -lah
         chmod +x src/main.sh
         src/main.sh "${{ inputs.image_name }}" "${{ inputs.ci_config }}" "${{ inputs.allow_large_image }}"
       shell: bash

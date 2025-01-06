@@ -9,15 +9,18 @@ ALLOW_LARGE_IMAGE=$3
 check_image_size() {
     IMAGE_SIZE=$(docker image inspect "$1" --format='{{.Size}}')
     IMAGE_SIZE_GB=$(bc <<< "scale=2; $IMAGE_SIZE / 1024 / 1024 / 1024")
-    echo "Image size: ${IMAGE_SIZE_GB} GB"
+    echo -e -n "Image size:"
+    echo -e -n "\033[1;33m ${IMAGE_SIZE_GB} \033[0m"
+    echo -e "GB"
 
     if (( $(echo "$IMAGE_SIZE_GB > 1" | bc -l) )); then
         if [[ "$ALLOW_LARGE_IMAGE" != "true" ]]; then
-            echo "Error: The image size exceeds 1 GB. Pass 'allow_large_image=true' to proceed."
-            exit 1
+	        echo -e -n "\033[1;31m Error: The image size exceeds 1 GB. \033[0m"
+		echo "Pass 'allow_large_image=true' to proceed."                                    
+		exit 1
         else
-            echo "Large image allowed. Continuing..."
-        fi
+	        echo -e "\033[1;32m Large image allowed. Continuing... \033[0m"
+	fi
     fi
 }
 
