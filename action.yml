@@ -31,7 +31,7 @@ runs:
         echo "::group::Downloading and installing Dive..."
         curl -OL https://github.com/wagoodman/dive/releases/download/v${DIVE_VERSION}/dive_${DIVE_VERSION}_linux_amd64.deb
         sudo apt install -qqq ./dive_${DIVE_VERSION}_linux_amd64.deb
-        echo "::endgroup::"   
+        echo "::endgroup::"
         src/go/analytic-img "${{ inputs.image_name }}" \
          "${{ inputs.ci_config }}" \
          "${{ inputs.allow_large_image }}" \
