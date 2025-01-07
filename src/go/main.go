@@ -66,6 +66,9 @@ func checkImageSize(imageName string, allowLargeImage, continueOnFail bool) bool
 
 func checkImage(imageName, ciConfig string, continueOnFail bool) {
 	cmd := exec.Command("dive", "--ci-config", ciConfig, imageName)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
 	if continueOnFail {
 		cmd.Env = append(os.Environ(), "CI=true")
 		if err := cmd.Run(); err != nil {
