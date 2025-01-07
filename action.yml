@@ -23,6 +23,14 @@ runs:
       with:
         repository: dzhunli/image-analytics
     - run: |
+         echo "::group::Fetching the latest Dive version..."
+         DIVE_VERSION=$(curl -sL "https://api.github.com/repos/wagoodman/dive/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+         echo "Latest Dive version: $DIVE_VERSION"
+	       echo "::endgroup::"
+	       echo "::group::Downloading and installing Dive..."
+         curl -OL https://github.com/wagoodman/dive/releases/download/v${DIVE_VERSION}/dive_${DIVE_VERSION}_linux_amd64.deb
+	       sudo apt install -qqq ./dive_${DIVE_VERSION}_linux_amd64.deb
+	       echo "::endgroup::"   
          src/go/analytic-img "${{ inputs.image_name }}" \
           "${{ inputs.ci_config }}" \
           "${{ inputs.allow_large_image }}" \
