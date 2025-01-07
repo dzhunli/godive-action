@@ -1,3 +1,4 @@
+---
 iname: "Dive CI Analysis"
 description: "Analyzes Docker images using Dive with CI"
 inputs:
@@ -24,7 +25,8 @@ runs:
         repository: dzhunli/image-analytics
     - run: |
          echo "::group::Fetching the latest Dive version..."
-         DIVE_VERSION=$(curl -sL "https://api.github.com/repos/wagoodman/dive/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+         DIVE_URL="https://api.github.com/repos/wagoodman/dive/releases/latest"
+         DIVE_VERSION=$(curl -sL $DIVE_URL | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
          echo "Latest Dive version: $DIVE_VERSION"
 	       echo "::endgroup::"
 	       echo "::group::Downloading and installing Dive..."
