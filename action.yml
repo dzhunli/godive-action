@@ -23,8 +23,9 @@ runs:
       with:
         repository: dzhunli/image-analytics
     - run: |
-        chmod +x src/main.sh
-        src/main.sh "${{ inputs.image_name }}" \
+#        chmod +x src/main.sh
+#        src/main.sh "${{ inputs.image_name }}" \
+         src/go/analytic-img "${{ inputs.image_name }}" \
           "${{ inputs.ci_config }}" \
           "${{ inputs.allow_large_image }}" \
           "${{ inputs.continue_on_fail }}"
