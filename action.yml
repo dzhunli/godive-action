@@ -26,8 +26,7 @@ runs:
     - run: |
          echo "::group::Fetching the latest Dive version..."
          DIVE_URL="https://api.github.com/repos/wagoodman/dive/releases/latest"
-         DIVE_VERSION=$(curl -sL $DIVE_URL | grep '"tag_name":'| \
-          sed -E 's/.*"v([^"]+)".*/\1/')
+         DIVE_VERSION=$(curl -sL $DIVE_URL | grep '"tag_name":'| sed -E 's/.*"v([^"]+)".*/\1/')
 	       echo "::endgroup::"
 	       echo "::group::Downloading and installing Dive..."
          curl -OL https://github.com/wagoodman/dive/releases/download/v${DIVE_VERSION}/dive_${DIVE_VERSION}_linux_amd64.deb
