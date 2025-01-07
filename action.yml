@@ -1,39 +1,39 @@
 ---
-iname: "Dive CI Analysis"
-description: "Analyzes Docker images using Dive with CI"
+iname: Dive CI Analysis
+description: Analyzes Docker images using Dive with CI
 inputs:
   image_name:
-    description: "Docker image name"
+    description: Docker image name
     required: true
   ci_config:
-    description: "Path to Dive CI configuration file (.dive-ci.yml)"
+    description: Path to Dive CI configuration file (.dive-ci.yml)
     required: true
   allow_large_image:
-    description: "Set to true if the image size exceeds 1 GB"
+    description: Set to true if the image size exceeds 1 GB
     required: false
     default: "false"
   continue_on_fail:
-    description: "Set false to fail launches that don't pass the test."
+    description: Set false to fail launches that don't pass the test.
     required: false
     default: "true"
 runs:
-  using: "composite"
+  using: composite
   steps:
     - name: Checkout action repository
       uses: actions/checkout@v4
       with:
         repository: dzhunli/image-analytics
-    - run: |
-         echo "::group::Fetching the latest Dive version..."
-         DIVE_URL="https://api.github.com/repos/wagoodman/dive/releases/latest"
-         DIVE_VERSION=$(curl -sL $DIVE_URL | grep '"tag_name":'| sed -E 's/.*"v([^"]+)".*/\1/')
-	       echo "::endgroup::"
-	       echo "::group::Downloading and installing Dive..."
-         curl -OL https://github.com/wagoodman/dive/releases/download/v${DIVE_VERSION}/dive_${DIVE_VERSION}_linux_amd64.deb
-	       sudo apt install -qqq ./dive_${DIVE_VERSION}_linux_amd64.deb
-	       echo "::endgroup::"   
-         src/go/analytic-img "${{ inputs.image_name }}" \
-          "${{ inputs.ci_config }}" \
-          "${{ inputs.allow_large_image }}" \
-          "${{ inputs.continue_on_fail }}"
+    - run: >
+        echo "::group::Fetching the latest Dive version..."
+        DIVE_URL="https://api.github.com/repos/wagoodman/dive/releases/latest"
+        DIVE_VERSION=$(curl -sL $DIVE_URL | grep '"tag_name":'| sed -E 's/.*"v([^"]+)".*/\1/')
+        echo "::endgroup::"
+        echo "::group::Downloading and installing Dive..."
+        curl -OL https://github.com/wagoodman/dive/releases/download/v${DIVE_VERSION}/dive_${DIVE_VERSION}_linux_amd64.deb
+        sudo apt install -qqq ./dive_${DIVE_VERSION}_linux_amd64.deb
+        echo "::endgroup::"   
+        src/go/analytic-img "${{ inputs.image_name }}" \
+         "${{ inputs.ci_config }}" \
+         "${{ inputs.allow_large_image }}" \
+         "${{ inputs.continue_on_fail }}"
       shell: bash
