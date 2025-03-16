@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -65,19 +66,23 @@ func checkImageSize(imageName string, allowLargeImage, continueOnFail bool) bool
 }
 
 func checkImage(imageName, ciConfig string, continueOnFail bool) {
+	reportFile, err := os.Create("DIVE_REPORT.md")
+	if err != nil {
+		log.Fatalf("Failed to create report file: %v", err)
+	}
+	defer reportFile.Close()
 	cmd := exec.Command("dive", "--ci-config", ciConfig, imageName)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if continueOnFail {
-		cmd.Env = append(os.Environ(), "CI=true")
-		if err := cmd.Run(); err != nil {
+	cmd.Env = append(os.Environ(), "CI=true")
+	cmd.Stdout = reportFile
+	cmd.Stderr = reportFile
+	multiWriter := io.MultiWriter(os.Stdout, reportFile)
+	cmd.Stdout = multiWriter
+	cmd.Stderr = multiWriter
+	if err := cmd.Run(); err != nil {
+		if continueOnFail {
 			fmt.Println("\033[1;33mCONTINUE POLICY ENABLED...\033[0m")
 			fmt.Println("\n\n#\tPass 'continue_on_fail=false' to fail actions that don't pass the test.")
-		}
-	} else {
-		cmd.Env = append(os.Environ(), "CI=true")
-		if err := cmd.Run(); err != nil {
+		} else {
 			log.Fatalf("Dive analysis failed: %v", err)
 		}
 	}
