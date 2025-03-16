@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -64,7 +65,10 @@ func checkImageSize(imageName string, allowLargeImage, continueOnFail bool) bool
 	}
 	return true
 }
-
+func removeANSICodes(input string) string {
+	ansiRegex := regexp.MustCompile("\033\\[[0-9;]*m")
+	return ansiRegex.ReplaceAllString(input, "")
+}
 func checkImage(imageName, ciConfig string, continueOnFail bool) {
 	reportFile, err := os.Create("DIVE_REPORT.md")
 	if err != nil {
@@ -73,17 +77,38 @@ func checkImage(imageName, ciConfig string, continueOnFail bool) {
 	defer reportFile.Close()
 	cmd := exec.Command("dive", "--ci-config", ciConfig, imageName)
 	cmd.Env = append(os.Environ(), "CI=true")
-	cmd.Stdout = reportFile
-	cmd.Stderr = reportFile
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Fatalf("Failed to create stdout pipe: %v", err)
+	}
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		log.Fatalf("Failed to create stderr pipe: %v", err)
+	}
+	if err := cmd.Start(); err != nil {
+		log.Fatalf("Failed to start command: %v", err)
+	}
 	multiWriter := io.MultiWriter(os.Stdout, reportFile)
-	cmd.Stdout = multiWriter
-	cmd.Stderr = multiWriter
-	if err := cmd.Run(); err != nil {
+	go func() {
+		io.Copy(multiWriter, stdoutPipe)
+	}()
+	go func() {
+		io.Copy(multiWriter, stderrPipe)
+	}()
+	if err := cmd.Wait(); err != nil {
 		if continueOnFail {
 			fmt.Println("\033[1;33mCONTINUE POLICY ENABLED...\033[0m")
 			fmt.Println("\n\n#\tPass 'continue_on_fail=false' to fail actions that don't pass the test.")
 		} else {
 			log.Fatalf("Dive analysis failed: %v", err)
 		}
+	}
+	content, err := os.ReadFile("DIVE_REPORT.md")
+	if err != nil {
+		log.Fatalf("Failed to read report file: %v", err)
+	}
+	cleanedContent := removeANSICodes(string(content))
+	if err := os.WriteFile("DIVE_REPORT.md", []byte(cleanedContent), 0644); err != nil {
+		log.Fatalf("Failed to write cleaned report file: %v", err)
 	}
 }
