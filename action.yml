@@ -22,7 +22,7 @@ runs:
     - name: Checkout action repository
       uses: actions/checkout@v4
       with:
-        repository: dzhunli/image-analytics
+        repository: dzhunli/godive-action
     - run: |
         echo "::group::Fetching the latest Dive version..."
         DIVE_VERSION=$(curl -sL "https://api.github.com/repos/wagoodman/dive/releases/latest" | grep '"tag_name":'| sed -E 's/.*"v([^"]+)".*/\1/')
