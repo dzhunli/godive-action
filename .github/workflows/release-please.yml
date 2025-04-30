@@ -1,0 +1,96 @@
+name: Release Action
+
+on:
+  push:
+    branches:
+    - main
+  workflow_dispatch:
+
+jobs:
+    lint-check:
+      uses: ./.github/workflows/lint-check.yaml
+
+    go-compile:
+      runs-on: ubuntu-24.04
+      steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.4'
+          cache-dependency-path: src/go/go.sum
+      - name: Install dependencies (if needed)
+        working-directory: src/go
+        run: |
+          go mod tidy
+      - name: Build binaries
+        working-directory: src/go
+        run: |
+          GOOS=linux GOARCH=amd64 go build -o godive-action
+  
+    tag:
+      needs: go-compile
+      runs-on: ubuntu-latest
+      outputs:
+        tag_name: ${{ steps.set-tag.outputs.tag_name }}
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
+            ref: main
+        - name: Get latest tag
+          id: get-latest-tag
+          run: |
+            git fetch --tags
+            latest_tag=$(git describe --tags `git rev-list --tags --max-count=1` || echo "v0.0.0")
+            echo "latest_tag=$latest_tag" >> $GITHUB_ENV
+        - name: Generate new tag
+          id: set-tag
+          run: |
+            IFS='.' read -r -a parts <<< ${latest_tag#v}
+            major=${parts[0]}
+            minor=${parts[1]}
+            patch=${parts[2]}
+            new_tag="v$major.$minor.$((patch + 1))"
+            echo "new_tag=$new_tag" >> $GITHUB_ENV
+            echo $new_tag
+            echo "tag_name=$new_tag" >> $GITHUB_OUTPUT
+          env:
+            latest_tag: ${{ env.latest_tag }}
+        - name: Push new tag using token
+          run: |
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag ${{ steps.set-tag.outputs.tag_name }}
+            git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}
+            git push origin ${{ steps.set-tag.outputs.tag_name }}
+
+    release:
+      runs-on: ubuntu-latest
+      needs: tag
+      steps:
+        - name: Checkout
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
+            fetch-tags: true
+            ref: main
+        - name: Generate release changelog
+          uses: varrcan/generate-pretty-changelog-action@v1
+          with:
+            config: changelog.yaml
+            use: github
+            token: ${{ secrets.PAT_TOKEN }}
+        - name: Release-please
+          uses: softprops/action-gh-release@v2
+          with:
+            tag_name: ${{ needs.tag.outputs.tag_name }}
+            name: "Release ${{ needs.tag.outputs.tag_name }}"
+            body_path: CHANGELOG.md
+            draft: false
+            prerelease: false
+            generate_release_notes: true
+            files: src/go/godive-action
+            token: ${{ secrets.PAT_TOKEN }}
