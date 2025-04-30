@@ -4,10 +4,14 @@ on:
       paths:
         - '**/*.yml'
         - '**/*.yaml'
+      paths-ignore:
+        - 'compiled/**'
     pull_request:
       paths:
         - '**/*.yml'
         - '**/*.yaml'
+      paths-ignore:
+        - 'compiled/**'
     workflow_dispatch:
     workflow_call:
 
