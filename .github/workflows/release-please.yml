@@ -4,6 +4,8 @@ on:
   push:
     branches:
     - main
+    paths-ignore:
+    - 'compiled/**'
   workflow_dispatch:
 
 jobs:
@@ -28,7 +30,15 @@ jobs:
         working-directory: src/go
         run: |
           GOOS=linux GOARCH=amd64 go build -o godive-action
-  
+          mkdir -p ../../compiled
+          mv godive-action ../../compiled/
+      - name: Commit compiled binary
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add compiled/godive-action
+          git commit -m "chore: Add compiled binary [auto][skip-ci]"
+          git push
     tag:
       needs: go-compile
       runs-on: ubuntu-latest
