@@ -52,9 +52,9 @@ runs:
         if [[ "${{ inputs.use_config }}" == "true" ]]; then
           dive_ci_conf="${{ inputs.ci_config }}"
         elif [[ "${{ inputs.use_config }}" == "false" ]]; then
-          if [[ -n "${{ inputs.lowestEfficiency }}" && -n "${{ inputs.highestUserWastedPercent }}" && -n "${{ inputs.allow_large_image }}" ]]; then
+          if [[ -n "${{ inputs.lowestEfficiency }}" && -n "${{ inputs.highestUserWastedPercent }}" && -n "${{ inputs.highestWastedBytes }}" ]]; then
             sed -i "s|<efficiency_percent>|${{ inputs.lowestEfficiency }}|g" blueprint.yaml
-            sed -i "s|<wasted_bytes>|${{ inputs.allow_large_image }}|g" blueprint.yaml
+            sed -i "s|<wasted_bytes>|${{ inputs.highestWastedBytes }}|g" blueprint.yaml
             sed -i "s|<wasted_percent>|${{ inputs.highestUserWastedPercent }}|g" blueprint.yaml
             cp blueprint.yaml /tmp/ci-config.yaml
             dive_ci_conf="/tmp/ci-config.yaml"
