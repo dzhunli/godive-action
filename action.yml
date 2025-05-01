@@ -5,9 +5,22 @@ inputs:
   image_name:
     description: Docker image name
     required: true
+  use_config:
+    description: Using CI config file or generate config from variables
+    required: false
+    default: "false"
   ci_config:
     description: Path to Dive CI configuration file (.dive-ci.yml)
-    required: true
+    required: false
+  lowestEfficiency:
+    description: Path to Dive CI configuration file (.dive-ci.yml)
+    required: false
+  highestWastedBytes:
+    description: Path to Dive CI configuration file (.dive-ci.yml)
+    required: false
+  highestUserWastedPercent:
+    description: Path to Dive CI configuration file (.dive-ci.yml)
+    required: false
   allow_large_image:
     description: Set to true if the image size exceeds 1 GB
     required: false
@@ -35,8 +48,27 @@ runs:
         curl -OL https://github.com/wagoodman/dive/releases/download/v${DIVE_VERSION}/dive_${DIVE_VERSION}_linux_amd64.deb
         sudo apt install -qqq ./dive_${DIVE_VERSION}_linux_amd64.deb
         echo "::endgroup::"
+        echo "::group::Configure ci..."
+        if [ "${{ inputs.use_config }}" = true ]; then
+          dive_ci_conf="${{ inputs.ci_config }}""
+        elif [ "${{ inputs.use_config }}" = false ]; then
+          if [ -n "${{ inputs.lowestEfficiency }}" ] && [ -n "${{ inputs.highestUserWastedPercent }}" ] && [ -n "${{ inputs.allow_large_image }}" ]; then
+            sed -i "s|<efficiency_percent>|${{ inputs.lowestEfficiency }}|g" blueprint.yaml
+            sed -i "s|<wasted_bytes>|${{ inputs.allow_large_image }}|g" blueprint.yaml
+            sed -i "s|<wasted_percent>|${{ inputs.highestUserWastedPercent }}|g" blueprint.yaml
+            cp blueprint.yaml /tmp/ci-config.yaml
+            dive_ci_conf=/tmp/ci-config.yaml
+          else
+            echo "Variable use_config is false, but one of variables (lowestEfficiency\highestWastedBytes\highestUserWastedPercent) not found.
+            exit 1
+          fi
+        else
+          echo "Variable use_config has not correct val(accept only bool): ${{ inputs.use_config }}"
+          exit 1
+        fi
+        echo "::endgroup::"
         compiled/godive-action "${{ inputs.image_name }}" \
-         "${{ inputs.ci_config }}" \
+         "$dive_ci_conf" \
          "${{ inputs.allow_large_image }}" \
          "${{ inputs.continue_on_fail }}" \
          "${{ inputs.report }}"
