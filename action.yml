@@ -49,21 +49,24 @@ runs:
         sudo apt install -qqq ./dive_${DIVE_VERSION}_linux_amd64.deb
         echo "::endgroup::"
         echo "::group::Configure ci..."
-        if [ "${{ inputs.use_config }}" = true ]; then
-          dive_ci_conf="${{ inputs.ci_config }}""
-        elif [ "${{ inputs.use_config }}" = false ]; then
-          if [ -n "${{ inputs.lowestEfficiency }}" ] && [ -n "${{ inputs.highestUserWastedPercent }}" ] && [ -n "${{ inputs.allow_large_image }}" ]; then
+        if [[ "${{ inputs.use_config }}" == "true" ]]; then
+          dive_ci_conf="${{ inputs.ci_config }}"
+        elif [[ "${{ inputs.use_config }}" == "false" ]]; then
+          if [[ -n "${{ inputs.lowestEfficiency }}" && -n "${{ inputs.highestUserWastedPercent }}" && -n "${{ inputs.allow_large_image }}" ]]; then
             sed -i "s|<efficiency_percent>|${{ inputs.lowestEfficiency }}|g" blueprint.yaml
             sed -i "s|<wasted_bytes>|${{ inputs.allow_large_image }}|g" blueprint.yaml
             sed -i "s|<wasted_percent>|${{ inputs.highestUserWastedPercent }}|g" blueprint.yaml
             cp blueprint.yaml /tmp/ci-config.yaml
-            dive_ci_conf=/tmp/ci-config.yaml
+            dive_ci_conf="/tmp/ci-config.yaml"
           else
-            echo "Variable use_config is false, but one of variables (lowestEfficiency\highestWastedBytes\highestUserWastedPercent) not found.
+            echo "❌ 'use_config' is false, but one or more required inputs are missing:"
+            echo "   - lowestEfficiency: '${{ inputs.lowestEfficiency }}'"
+            echo "   - highestUserWastedPercent: '${{ inputs.highestUserWastedPercent }}'"
+            echo "   - allow_large_image: '${{ inputs.allow_large_image }}'"
             exit 1
           fi
         else
-          echo "Variable use_config has not correct val(accept only bool): ${{ inputs.use_config }}"
+          echo "❌ Invalid value for 'use_config': '${{ inputs.use_config }}'. Expected 'true' or 'false'."
           exit 1
         fi
         echo "::endgroup::"
