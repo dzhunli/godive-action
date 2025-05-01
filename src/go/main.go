@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Release struct {
@@ -70,6 +72,33 @@ func removeANSICodes(input string) string {
 	ansiRegex := regexp.MustCompile("\033\\[[0-9;]*m")
 	return ansiRegex.ReplaceAllString(input, "")
 }
+func showProgressBar(done <-chan struct{}) {
+	const totalBlocks = 100
+	progressChar := "█"
+	emptyChar := " "
+
+	steps := 0
+	for {
+		select {
+		case <-done:
+			return
+		default:
+			percent := steps % (totalBlocks + 1)
+			bar := fmt.Sprintf("[%s%s] %d%%",
+				repeat(progressChar, percent),
+				repeat(emptyChar, totalBlocks-percent),
+				(percent*100)/totalBlocks,
+			)
+			fmt.Printf("\rAnalyzing image... %s", bar)
+			time.Sleep(200 * time.Millisecond)
+			steps++
+		}
+	}
+}
+func repeat(char string, count int) string {
+	return fmt.Sprintf("%s", bytes.Repeat([]byte(char), count))
+}
+
 func checkImage(imageName, ciConfig string, continueOnFail bool, reportEnabled bool) {
 	var multiWriter io.Writer = os.Stdout
 	var reportFile *os.File
@@ -93,9 +122,14 @@ func checkImage(imageName, ciConfig string, continueOnFail bool, reportEnabled b
 	if err != nil {
 		log.Fatalf("Failed to create stderr pipe: %v", err)
 	}
+
 	if err := cmd.Start(); err != nil {
 		log.Fatalf("Failed to start command: %v", err)
 	}
+
+	done := make(chan struct{})
+
+	go showProgressBar(done)
 
 	go func() {
 		io.Copy(multiWriter, stdoutPipe)
@@ -103,7 +137,12 @@ func checkImage(imageName, ciConfig string, continueOnFail bool, reportEnabled b
 	go func() {
 		io.Copy(multiWriter, stderrPipe)
 	}()
-	if err := cmd.Wait(); err != nil {
+
+	err = cmd.Wait()
+	close(done)
+	fmt.Print("\r")
+
+	if err != nil {
 		if continueOnFail {
 			fmt.Println("\033[1;33mCONTINUE POLICY ENABLED...\033[0m")
 			fmt.Println("\n\n#\tPass 'continue_on_fail=false' to fail actions that don't pass the test.")
