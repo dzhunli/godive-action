@@ -9,38 +9,36 @@ jobs:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
-
-      - name: Get PR number and generate tag
+      - name: Get PR number and generate tag prefix
         id: pr
         run: |
           pr_number=${{ github.event.pull_request.number }}
           tag_prefix="pr-${pr_number}-"
           echo "tag_prefix=$tag_prefix" >> $GITHUB_OUTPUT
-
-      - name: List all pre-releases for PR
-        id: find_release
+      - name: Find matching release tag
+        id: find_tag
         run: |
           tag_prefix="${{ steps.pr.outputs.tag_prefix }}"
-          release_id=$(gh release list --limit 100 --json name,id \
-            --jq ".[] | select(.name | startswith(\"Pre-release for PR #${{ github.event.pull_request.number }}\")) | .id")
+          tag=$(gh release list --limit 100 --json name,tagName \
+            --jq ".[] | select(.tagName | startswith(\"${tag_prefix}\")) | .tagName" | head -n 1)
 
-          if [ -n "$release_id" ]; then
-            echo "release_id=$release_id" >> $GITHUB_OUTPUT
+          if [ -n "$tag" ]; then
+            echo "tag=$tag" >> $GITHUB_OUTPUT
+            echo "Found tag: $tag"
+          else
+            echo "No matching release found."
           fi
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
 
       - name: Delete GitHub Release (if found)
-        if: steps.find_release.outputs.release_id != ''
+        if: steps.find_tag.outputs.tag != ''
         run: |
-          gh release delete ${{ steps.pr.outputs.tag_prefix }} --yes
+          gh release delete "${{ steps.find_tag.outputs.tag }}" --yes
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
 
-      - name: Delete Git Tag(s)
+      - name: Delete Git Tag (if found)
+        if: steps.find_tag.outputs.tag != ''
         run: |
-          git fetch --tags
-          prefix=${{ steps.pr.outputs.tag_prefix }}
-          for tag in $(git tag | grep "^$prefix"); do
-            git push origin :refs/tags/$tag
-          done
+          git push origin ":refs/tags/${{ steps.find_tag.outputs.tag }}"
