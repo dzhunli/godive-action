@@ -17,13 +17,14 @@ type Release struct {
 
 func main() {
 	if len(os.Args) < 5 {
-		log.Fatalf("Usage: %s <image_name> <ci_config> <allow_large_image> <continue_on_fail>", os.Args[0])
+		log.Fatalf("Usage: %s <image_name> <ci_config> <allow_large_image> <continue_on_fail> <report>", os.Args[0])
 	}
 
 	imageName := os.Args[1]
 	ciConfig := os.Args[2]
 	allowLargeImage := os.Args[3] == "true"
 	continueOnFail := os.Args[4] == "true"
+	reportEnabled := os.Args[5] == "true"
 
 	fmt.Println("Checking Docker image size...")
 	if !checkImageSize(imageName, allowLargeImage, continueOnFail) {
@@ -31,7 +32,7 @@ func main() {
 	}
 
 	fmt.Printf("Running Dive analysis on image: %s with CI config: %s\n", imageName, ciConfig)
-	checkImage(imageName, ciConfig, continueOnFail)
+	checkImage(imageName, ciConfig, continueOnFail, reportEnabled)
 }
 
 func checkImageSize(imageName string, allowLargeImage, continueOnFail bool) bool {
@@ -69,12 +70,19 @@ func removeANSICodes(input string) string {
 	ansiRegex := regexp.MustCompile("\033\\[[0-9;]*m")
 	return ansiRegex.ReplaceAllString(input, "")
 }
-func checkImage(imageName, ciConfig string, continueOnFail bool) {
-	reportFile, err := os.Create("DIVE_REPORT.md")
-	if err != nil {
-		log.Fatalf("Failed to create report file: %v", err)
+func checkImage(imageName, ciConfig string, continueOnFail bool, reportEnabled bool) {
+	var multiWriter io.Writer = os.Stdout
+	var reportFile *os.File
+	if reportEnabled {
+		var err error
+		reportFile, err = os.Create("/tmp/DIVE_REPORT.md")
+		if err != nil {
+			log.Fatalf("Failed to create report file: %v", err)
+		}
+		defer reportFile.Close()
+		multiWriter = io.MultiWriter(os.Stdout, reportFile)
 	}
-	defer reportFile.Close()
+
 	cmd := exec.Command("dive", "--ci-config", ciConfig, imageName)
 	cmd.Env = append(os.Environ(), "CI=true")
 	stdoutPipe, err := cmd.StdoutPipe()
@@ -88,7 +96,7 @@ func checkImage(imageName, ciConfig string, continueOnFail bool) {
 	if err := cmd.Start(); err != nil {
 		log.Fatalf("Failed to start command: %v", err)
 	}
-	multiWriter := io.MultiWriter(os.Stdout, reportFile)
+
 	go func() {
 		io.Copy(multiWriter, stdoutPipe)
 	}()
@@ -103,12 +111,14 @@ func checkImage(imageName, ciConfig string, continueOnFail bool) {
 			log.Fatalf("Dive analysis failed: %v", err)
 		}
 	}
-	content, err := os.ReadFile("DIVE_REPORT.md")
-	if err != nil {
-		log.Fatalf("Failed to read report file: %v", err)
-	}
-	cleanedContent := removeANSICodes(string(content))
-	if err := os.WriteFile("DIVE_REPORT.md", []byte(cleanedContent), 0644); err != nil {
-		log.Fatalf("Failed to write cleaned report file: %v", err)
+	if reportEnabled {
+		content, err := os.ReadFile("/tmp/DIVE_REPORT.md")
+		if err != nil {
+			log.Fatalf("Failed to read report file: %v", err)
+		}
+		cleanedContent := removeANSICodes(string(content))
+		if err := os.WriteFile("/tmp/DIVE_REPORT.md", []byte(cleanedContent), 0644); err != nil {
+			log.Fatalf("Failed to write cleaned report file: %v", err)
+		}
 	}
 }
