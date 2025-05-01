@@ -1,0 +1,4 @@
+rules:
+  lowestEfficiency: <efficiency_percent>
+  highestWastedBytes: <wasted_bytes>
+  highestUserWastedPercent: <wasted_percent>
