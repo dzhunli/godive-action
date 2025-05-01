@@ -15,7 +15,6 @@ jobs:
           pr_number=${{ github.event.pull_request.number }}
           tag_prefix="pr-${pr_number}-"
           echo "tag_prefix=$tag_prefix" >> $GITHUB_OUTPUT
-
       - name: Find matching release tag
         id: find_tag
         run: |
