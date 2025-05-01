@@ -1,11 +1,6 @@
 name: Release Action
 
 on:
-  push:
-    branches:
-    - main
-    paths-ignore:
-    - 'compiled/**'
   workflow_dispatch:
 
 jobs:
