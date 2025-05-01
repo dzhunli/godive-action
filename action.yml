@@ -13,13 +13,13 @@ inputs:
     description: Path to Dive CI configuration file (.dive-ci.yml)
     required: false
   lowestEfficiency:
-    description: Path to Dive CI configuration file (.dive-ci.yml)
+    description: If the efficiency is measured below X%, mark as failed.Expressed as a ratio between 0-1.
     required: false
   highestWastedBytes:
-    description: Path to Dive CI configuration file (.dive-ci.yml)
+    description: If the amount of wasted space is at least X or larger than X, mark as failed.Expressed in B, KB, MB, and GB.
     required: false
   highestUserWastedPercent:
-    description: Path to Dive CI configuration file (.dive-ci.yml)
+    description: If the amount of wasted space makes up for X% or more of the image, mark as failed.Expressed as a ratio between 0-1; fails if the threshold is met or crossed.
     required: false
   allow_large_image:
     description: Set to true if the image size exceeds 1 GB
