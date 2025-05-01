@@ -16,6 +16,10 @@ inputs:
     description: Set false to fail launches that don't pass the test.
     required: false
     default: "true"
+  report:
+    description: Enable report generation to /tmp/DIVE_REPORT.md
+    required: false
+    default: "false"
 runs:
   using: composite
   steps:
@@ -34,5 +38,6 @@ runs:
         compiled/godive-action "${{ inputs.image_name }}" \
          "${{ inputs.ci_config }}" \
          "${{ inputs.allow_large_image }}" \
-         "${{ inputs.continue_on_fail }}"
+         "${{ inputs.continue_on_fail }}" \
+         "${{ inputs.report }}"
       shell: bash
