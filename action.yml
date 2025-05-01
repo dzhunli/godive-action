@@ -32,6 +32,10 @@ inputs:
   report:
     description: Enable report generation to /tmp/DIVE_REPORT.md
     required: false
+    default: "true"
+  summary:
+    description: Enable summary generation from /tmp/DIVE_REPORT.md
+    required: false
     default: "false"
 runs:
   using: composite
@@ -75,4 +79,31 @@ runs:
          "${{ inputs.allow_large_image }}" \
          "${{ inputs.continue_on_fail }}" \
          "${{ inputs.report }}"
+      shell: bash
+    - name: Generate Summary
+      if: inputs.summary == 'true'
+      run: |
+        echo "🔍 Summary report is enabled."
+        echo "Generating summary for image: ${{ inputs.image_name }}"
+        # Здесь можно вставить нужную команду для генерации summary
+        # Например: ./generate-summary.sh "${{ inputs.image_name }}"
+      run: |
+        if [[ ! -f /tmp/DIVE_REPORT.md ]]; then
+          echo "❌ DIVE_REPORT.md not found(you may need set report=true).Skipping summary generation." >> $GITHUB_STEP_SUMMARY
+          exit 0
+        fi
+        {
+          echo ""
+          echo "---"
+          echo "## 🧪 Dive analysis result for \`${{ inputs.image_name }}\`"
+          echo ""
+          echo '```markdown'
+          echo "### 🖼️ Image Info"
+          grep -E '^Analyzing image' DIVE_REPORT.md | head -n 1 || echo "No image info found."
+          echo ""
+          echo "### 📊 Analysis Summary"
+          grep -A 10 '^Results:' DIVE_REPORT.md || echo "No results section found."
+          echo ""
+          echo '```'
+        } >> $GITHUB_STEP_SUMMARY
       shell: bash
