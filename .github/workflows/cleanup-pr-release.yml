@@ -1,0 +1,46 @@
+name: Cleanup PR Pre-release
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  cleanup:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Get PR number and generate tag
+        id: pr
+        run: |
+          pr_number=${{ github.event.pull_request.number }}
+          tag_prefix="pr-${pr_number}-"
+          echo "tag_prefix=$tag_prefix" >> $GITHUB_OUTPUT
+
+      - name: List all pre-releases for PR
+        id: find_release
+        run: |
+          tag_prefix="${{ steps.pr.outputs.tag_prefix }}"
+          release_id=$(gh release list --limit 100 --json name,id \
+            --jq ".[] | select(.name | startswith(\"Pre-release for PR #${{ github.event.pull_request.number }}\")) | .id")
+
+          if [ -n "$release_id" ]; then
+            echo "release_id=$release_id" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+      - name: Delete GitHub Release (if found)
+        if: steps.find_release.outputs.release_id != ''
+        run: |
+          gh release delete ${{ steps.pr.outputs.tag_prefix }} --yes
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+      - name: Delete Git Tag(s)
+        run: |
+          git fetch --tags
+          prefix=${{ steps.pr.outputs.tag_prefix }}
+          for tag in $(git tag | grep "^$prefix"); do
+            git push origin :refs/tags/$tag
+          done
