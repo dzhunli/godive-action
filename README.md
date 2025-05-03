@@ -110,6 +110,6 @@ Your ideas, suggestions, and code are very welcome!
 
 ## 🙏 Credits
 
-- Based on the awesome tool dive by @wagoodman
+- Based on the awesome tool dive by [@wagoodman](https://github.com/wagoodman)
 
-- Maintained by @dzhunli
+- Maintained by [@dzhunli](https://github.com/dzhunli)
