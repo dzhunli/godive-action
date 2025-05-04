@@ -1,5 +1,10 @@
 ---
-iname: Dive CI Analysis
+name: "godive action"
+description: "Simple action to analyze built docker images efficiency"
+author: '@dzhunli'
+branding:
+  icon: 'anchor'
+  color: 'blue'
 description: Analyzes Docker images using Dive with CI
 inputs:
   image_name:
