@@ -5,7 +5,6 @@ author: '@dzhunli'
 branding:
   icon: 'anchor'
   color: 'blue'
-description: Analyzes Docker images using Dive with CI
 inputs:
   image_name:
     description: Docker image name
