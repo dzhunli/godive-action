@@ -97,10 +97,10 @@ runs:
           echo "## 🧪 Dive analysis result for \`${{ inputs.image_name }}\`"
           echo ""
           echo '```markdown'
-          echo "###  🐳  Image Info"
+          echo " 🐳  Image Info"
           grep -A 3 '^Analyzing image' /tmp/DIVE_REPORT.md  || echo "No image info found."
           echo ""
-          echo "### 📊 Analysis Summary"
+          echo " 📊 Analysis Summary"
           grep -A 10 '^Results:' /tmp/DIVE_REPORT.md || echo "No results section found."
           echo ""
           echo '```'
