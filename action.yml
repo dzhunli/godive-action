@@ -98,7 +98,7 @@ runs:
           echo ""
           echo '```markdown'
           echo "###  🐳  Image Info"
-          grep -E '^Analyzing image' /tmp/DIVE_REPORT.md | head -n 1 || echo "No image info found."
+          grep -A 3 '^Analyzing image' /tmp/DIVE_REPORT.md  || echo "No image info found."
           echo ""
           echo "### 📊 Analysis Summary"
           grep -A 10 '^Results:' /tmp/DIVE_REPORT.md || echo "No results section found."
