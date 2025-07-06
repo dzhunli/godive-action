@@ -6,7 +6,7 @@ on:
 
 jobs:
   cleanup:
-    if: github.event.pull_request.merged == true
+    if: github.event.pull_request.merged == true || github.event.pull_request.state == 'closed'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
