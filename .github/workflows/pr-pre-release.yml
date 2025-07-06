@@ -11,6 +11,10 @@ jobs:
     uses: ./.github/workflows/lint-check.yaml
 
   trivy-check:
+    permissions:
+      contents: read 
+      security-events: write
+      actions: read
     name: trivy-check
     runs-on: ubuntu-24.04
     steps:
@@ -22,7 +26,7 @@ jobs:
         with:
           scan-type: 'fs'
           ignore-unfixed: true
-          scan-ref: .
+          #scan-ref: .
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL'
