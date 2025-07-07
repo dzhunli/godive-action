@@ -16,7 +16,7 @@ jobs:
       contents: read
       security-events: write
       actions: read
-    name: Build
+    name: TRIVY
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
