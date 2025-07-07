@@ -46,7 +46,7 @@ jobs:
       - name: Comment PR with Trivy scan results
         uses: marocchino/sticky-pull-request-comment@v2.9.0
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           path: formatted-trivy-result.md
 
       - name: Clean up Trivy result file
