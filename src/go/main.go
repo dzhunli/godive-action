@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -10,15 +10,20 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 )
 
-type Release struct {
-	TagName string `json:"tag_name"`
-}
+const (
+	reportPath = "/tmp/DIVE_REPORT.md"
+	maxSizeGB  = 1.0
+)
+
+var ansiRegex = regexp.MustCompile("\033\\[[0-9;]*m")
 
 func main() {
-	if len(os.Args) < 5 {
+	log.SetFlags(0)
+
+	// program name + 5 arguments
+	if len(os.Args) < 6 {
 		log.Fatalf("Usage: %s <image_name> <ci_config> <allow_large_image> <continue_on_fail> <report>", os.Args[0])
 	}
 
@@ -41,7 +46,7 @@ func checkImageSize(imageName string, allowLargeImage, continueOnFail bool) bool
 	cmd := exec.Command("docker", "image", "inspect", imageName, "--format={{.Size}}")
 	output, err := cmd.Output()
 	if err != nil {
-		log.Fatalf("Failed to inspect Docker image: %v", err)
+		log.Fatalf("Failed to inspect Docker image %q (is it built/pulled locally?): %v", imageName, err)
 	}
 
 	sizeBytes, err := strconv.ParseFloat(strings.TrimSpace(string(output)), 64)
@@ -52,112 +57,92 @@ func checkImageSize(imageName string, allowLargeImage, continueOnFail bool) bool
 	sizeGB := sizeBytes / (1024 * 1024 * 1024)
 	fmt.Printf("Image size: \033[1;33m%.2f GB\033[0m\n", sizeGB)
 
-	if sizeGB > 1 {
-		if !allowLargeImage {
-			fmt.Println("\033[1;31mError: The image size exceeds 1 GB.\033[0m")
-			fmt.Println("\n\n#\tPass 'allow_large_image=true' to proceed.")
-			if continueOnFail {
-				fmt.Println("#\tPass 'continue_on_fail=false' to fail actions that don't pass the test.")
-				fmt.Println("\033[1;33mCONTINUE POLICY ENABLED...\033[0m")
-				return false
-			}
-			os.Exit(1)
-		} else {
-			fmt.Println("\033[1;32mLarge image allowed. Continuing...\033[0m")
-		}
+	if sizeGB <= maxSizeGB {
+		return true
 	}
-	return true
-}
-func removeANSICodes(input string) string {
-	ansiRegex := regexp.MustCompile("\033\\[[0-9;]*m")
-	return ansiRegex.ReplaceAllString(input, "")
-}
-func showProgressBar(done <-chan struct{}) {
-	const totalBlocks = 100
-	progressChar := "█"
-	emptyChar := " "
 
-	steps := 0
-	for {
-		select {
-		case <-done:
-			return
-		default:
-			percent := steps % (totalBlocks + 1)
-			bar := fmt.Sprintf("[%s%s] %d%%",
-				repeat(progressChar, percent),
-				repeat(emptyChar, totalBlocks-percent),
-				(percent*100)/totalBlocks,
-			)
-			fmt.Printf("\rAnalyzing image... %s", bar)
-			time.Sleep(200 * time.Millisecond)
-			steps++
-		}
+	if allowLargeImage {
+		fmt.Println("\033[1;32mLarge image allowed. Continuing...\033[0m")
+		return true
 	}
-}
-func repeat(char string, count int) string {
-	return fmt.Sprintf("%s", bytes.Repeat([]byte(char), count))
+
+	fmt.Println("\033[1;31mError: The image size exceeds 1 GB.\033[0m")
+	fmt.Println("\n\n#\tPass 'allow_large_image=true' to proceed.")
+	if continueOnFail {
+		fmt.Println("#\tPass 'continue_on_fail=false' to fail actions that don't pass the test.")
+		fmt.Println("\033[1;33mCONTINUE POLICY ENABLED...\033[0m")
+		fmt.Println("::warning title=Dive analysis::Image is larger than 1 GB, analysis skipped (set allow_large_image=true)")
+		return false
+	}
+	fmt.Println("::error title=Dive analysis::Image is larger than 1 GB, analysis skipped (set allow_large_image=true)")
+	os.Exit(1)
+	return false
 }
 
-func checkImage(imageName, ciConfig string, continueOnFail bool, reportEnabled bool) {
-	var multiWriter io.Writer = os.Stdout
+func checkImage(imageName, ciConfig string, continueOnFail, reportEnabled bool) {
+	if _, err := os.Stat(ciConfig); err != nil {
+		log.Fatalf("Dive CI config not found: %v", err)
+	}
+
+	var out io.Writer = os.Stdout
 	var reportFile *os.File
 	if reportEnabled {
-		var err error
-		reportFile, err = os.Create("/tmp/DIVE_REPORT.md")
+		f, err := os.Create(reportPath)
 		if err != nil {
 			log.Fatalf("Failed to create report file: %v", err)
 		}
-		defer reportFile.Close()
-		multiWriter = io.MultiWriter(os.Stdout, reportFile)
+		reportFile = f
+		out = io.MultiWriter(os.Stdout, f)
 	}
+
+	fmt.Println("Analyzing image...")
 
 	cmd := exec.Command("dive", "--ci-config", ciConfig, imageName)
 	cmd.Env = append(os.Environ(), "CI=true")
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		log.Fatalf("Failed to create stdout pipe: %v", err)
-	}
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		log.Fatalf("Failed to create stderr pipe: %v", err)
-	}
+	// The same writer for both streams: exec serializes the writes
+	// and Run waits until all output has been copied.
+	cmd.Stdout = out
+	cmd.Stderr = out
+	err := cmd.Run()
 
-	if err := cmd.Start(); err != nil {
-		log.Fatalf("Failed to start command: %v", err)
-	}
-
-	done := make(chan struct{})
-
-	go showProgressBar(done)
-
-	go func() {
-		io.Copy(multiWriter, stdoutPipe)
-	}()
-	go func() {
-		io.Copy(multiWriter, stderrPipe)
-	}()
-
-	err = cmd.Wait()
-	close(done)
-	fmt.Print("\r")
-
-	if err != nil {
-		if continueOnFail {
-			fmt.Println("\033[1;33mCONTINUE POLICY ENABLED...\033[0m")
-			fmt.Println("\n\n#\tPass 'continue_on_fail=false' to fail actions that don't pass the test.")
-		} else {
-			log.Fatalf("Dive analysis failed: %v", err)
+	if reportFile != nil {
+		reportFile.Close()
+		if cleanErr := cleanReport(); cleanErr != nil {
+			fmt.Printf("::warning title=Dive analysis::Failed to clean report: %v\n", cleanErr)
 		}
 	}
-	if reportEnabled {
-		content, err := os.ReadFile("/tmp/DIVE_REPORT.md")
-		if err != nil {
-			log.Fatalf("Failed to read report file: %v", err)
-		}
-		cleanedContent := removeANSICodes(string(content))
-		if err := os.WriteFile("/tmp/DIVE_REPORT.md", []byte(cleanedContent), 0644); err != nil {
-			log.Fatalf("Failed to write cleaned report file: %v", err)
-		}
+
+	if err == nil {
+		return
 	}
+
+	// dive could not be started at all: this is an environment problem,
+	// not a failed quality gate, so continue_on_fail must not hide it.
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		log.Fatalf("Failed to run dive: %v", err)
+	}
+
+	if continueOnFail {
+		fmt.Println("\033[1;33mCONTINUE POLICY ENABLED...\033[0m")
+		fmt.Println("\n\n#\tPass 'continue_on_fail=false' to fail actions that don't pass the test.")
+		fmt.Println("::warning title=Dive analysis::Image did not pass the checks (continue_on_fail=true)")
+		return
+	}
+
+	fmt.Println("::error title=Dive analysis::Image did not pass the checks")
+	code := exitErr.ExitCode()
+	if code <= 0 {
+		code = 1
+	}
+	os.Exit(code)
+}
+
+func cleanReport() error {
+	content, err := os.ReadFile(reportPath)
+	if err != nil {
+		return err
+	}
+	cleaned := ansiRegex.ReplaceAllString(string(content), "")
+	return os.WriteFile(reportPath, []byte(cleaned), 0644)
 }
