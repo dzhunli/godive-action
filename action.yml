@@ -1,4 +1,3 @@
----
 name: "godive action"
 description: "Simple action to analyze built docker images efficiency"
 author: '@dzhunli'
@@ -17,13 +16,13 @@ inputs:
     description: Path to Dive CI configuration file (.dive-ci.yml)
     required: false
   lowestEfficiency:
-    description: If the efficiency is measured below X%, mark as failed.Expressed as a ratio between 0-1.
+    description: If the efficiency is measured below X%, mark as failed. Expressed as a ratio between 0-1.
     required: false
   highestWastedBytes:
-    description: If the amount of wasted space is at least X or larger than X, mark as failed.Expressed in B, KB, MB, and GB.
+    description: If the amount of wasted space is at least X or larger than X, mark as failed. Expressed in B, KB, MB, and GB.
     required: false
   highestUserWastedPercent:
-    description: If the amount of wasted space makes up for X% or more of the image, mark as failed.Expressed as a ratio between 0-1; fails if the threshold is met or crossed.
+    description: If the amount of wasted space makes up for X% or more of the image, mark as failed. Expressed as a ratio between 0-1; fails if the threshold is met or crossed.
     required: false
   allow_large_image:
     description: Set to true if the image size exceeds 1 GB
@@ -41,68 +40,136 @@ inputs:
     description: Enable summary generation from /tmp/DIVE_REPORT.md
     required: false
     default: "false"
+  dive_version:
+    description: Dive version to install (e.g. 0.13.1). Use "latest" to take the newest release.
+    required: false
+    default: "latest"
 runs:
   using: composite
   steps:
-    - name: Checkout action repository
-      uses: actions/checkout@v4
-      with:
-        repository: dzhunli/godive-action
-    - run: |
-        echo "::group::Fetching the latest Dive version..."
-        DIVE_VERSION=$(curl -sL "https://api.github.com/repos/wagoodman/dive/releases/latest" | grep '"tag_name":'| sed -E 's/.*"v([^"]+)".*/\1/')
-        echo "::endgroup::"
-        echo "::group::Downloading and installing Dive..."
-        curl -OL https://github.com/wagoodman/dive/releases/download/v${DIVE_VERSION}/dive_${DIVE_VERSION}_linux_amd64.deb
-        sudo apt install -qqq ./dive_${DIVE_VERSION}_linux_amd64.deb
-        echo "::endgroup::"
-        echo "::group::Configure ci..."
-        if [[ "${{ inputs.use_config }}" == "true" ]]; then
-          dive_ci_conf="${{ inputs.ci_config }}"
-        elif [[ "${{ inputs.use_config }}" == "false" ]]; then
-          if [[ -n "${{ inputs.lowestEfficiency }}" && -n "${{ inputs.highestUserWastedPercent }}" && -n "${{ inputs.highestWastedBytes }}" ]]; then
-            sed -i "s|<efficiency_percent>|${{ inputs.lowestEfficiency }}|g" blueprint.yaml
-            sed -i "s|<wasted_bytes>|${{ inputs.highestWastedBytes }}|g" blueprint.yaml
-            sed -i "s|<wasted_percent>|${{ inputs.highestUserWastedPercent }}|g" blueprint.yaml
-            cp blueprint.yaml /tmp/ci-config.yaml
-            dive_ci_conf="/tmp/ci-config.yaml"
-          else
-            echo "❌ 'use_config' is false, but one or more required inputs are missing:"
-            echo "   - lowestEfficiency: '${{ inputs.lowestEfficiency }}'"
-            echo "   - highestUserWastedPercent: '${{ inputs.highestUserWastedPercent }}'"
-            echo "   - allow_large_image: '${{ inputs.allow_large_image }}'"
-            exit 1
-          fi
+    # No checkout here: a composite action already lives in ${{ github.action_path }}
+    # at the exact ref the user pinned (e.g. @v2.0.8).
+
+    - name: Install Dive
+      shell: bash
+      env:
+        DIVE_VERSION_INPUT: ${{ inputs.dive_version }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+
+        if [[ "$DIVE_VERSION_INPUT" == "latest" ]]; then
+          echo "::group::Fetching the latest Dive version..."
+          DIVE_VERSION=$(curl -fsSL -H "Authorization: Bearer ${GH_TOKEN}" \
+            "https://api.github.com/repos/wagoodman/dive/releases/latest" \
+            | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')
+          echo "::endgroup::"
         else
-          echo "❌ Invalid value for 'use_config': '${{ inputs.use_config }}'. Expected 'true' or 'false'."
+          DIVE_VERSION="${DIVE_VERSION_INPUT#v}"
+        fi
+
+        if [[ -z "$DIVE_VERSION" ]]; then
+          echo "::error::Could not determine the Dive version"
           exit 1
         fi
+
+        echo "::group::Downloading and installing Dive ${DIVE_VERSION}..."
+        deb="dive_${DIVE_VERSION}_linux_amd64.deb"
+        curl -fsSL -o "${RUNNER_TEMP}/${deb}" \
+          "https://github.com/wagoodman/dive/releases/download/v${DIVE_VERSION}/${deb}"
+        sudo apt-get install -y -qq "${RUNNER_TEMP}/${deb}"
         echo "::endgroup::"
-        compiled/godive-action "${{ inputs.image_name }}" \
-         "$dive_ci_conf" \
-         "${{ inputs.allow_large_image }}" \
-         "${{ inputs.continue_on_fail }}" \
-         "${{ inputs.report }}"
+
+    - name: Configure CI thresholds
+      id: config
       shell: bash
+      env:
+        USE_CONFIG: ${{ inputs.use_config }}
+        CI_CONFIG: ${{ inputs.ci_config }}
+        LOWEST_EFFICIENCY: ${{ inputs.lowestEfficiency }}
+        HIGHEST_WASTED_BYTES: ${{ inputs.highestWastedBytes }}
+        HIGHEST_USER_WASTED_PERCENT: ${{ inputs.highestUserWastedPercent }}
+      run: |
+        set -euo pipefail
+        echo "::group::Configure ci..."
+
+        case "$USE_CONFIG" in
+          true)
+            if [[ -z "$CI_CONFIG" ]]; then
+              echo "::error::'use_config' is true, but 'ci_config' is not set"
+              exit 1
+            fi
+            if [[ ! -f "$CI_CONFIG" ]]; then
+              echo "::error::ci_config file not found: '$CI_CONFIG'"
+              exit 1
+            fi
+            conf="$CI_CONFIG"
+            ;;
+          false)
+            missing=()
+            [[ -n "$LOWEST_EFFICIENCY" ]] || missing+=("lowestEfficiency")
+            [[ -n "$HIGHEST_WASTED_BYTES" ]] || missing+=("highestWastedBytes")
+            [[ -n "$HIGHEST_USER_WASTED_PERCENT" ]] || missing+=("highestUserWastedPercent")
+            if (( ${#missing[@]} > 0 )); then
+              echo "::error::'use_config' is false, but required inputs are missing: ${missing[*]}"
+              exit 1
+            fi
+
+            ratio='^[0-9]*\.?[0-9]+$'
+            size='^[0-9]+(\.[0-9]+)?[[:space:]]?([KkMmGg]i?)?[Bb]$'
+            [[ "$LOWEST_EFFICIENCY" =~ $ratio ]] || { echo "::error::lowestEfficiency must be a number between 0 and 1, got '$LOWEST_EFFICIENCY'"; exit 1; }
+            [[ "$HIGHEST_USER_WASTED_PERCENT" =~ $ratio ]] || { echo "::error::highestUserWastedPercent must be a number between 0 and 1, got '$HIGHEST_USER_WASTED_PERCENT'"; exit 1; }
+            [[ "$HIGHEST_WASTED_BYTES" =~ $size ]] || { echo "::error::highestWastedBytes must look like 500KB or 10MB, got '$HIGHEST_WASTED_BYTES'"; exit 1; }
+
+            conf="${RUNNER_TEMP}/dive-ci.yaml"
+            printf 'rules:\n  lowestEfficiency: %s\n  highestWastedBytes: %s\n  highestUserWastedPercent: %s\n' \
+              "$LOWEST_EFFICIENCY" "$HIGHEST_WASTED_BYTES" "$HIGHEST_USER_WASTED_PERCENT" > "$conf"
+            ;;
+          *)
+            echo "::error::Invalid value for 'use_config': '$USE_CONFIG'. Expected 'true' or 'false'."
+            exit 1
+            ;;
+        esac
+
+        echo "path=$conf" >> "$GITHUB_OUTPUT"
+        echo "::endgroup::"
+
+    - name: Run Dive analysis
+      shell: bash
+      env:
+        IMAGE_NAME: ${{ inputs.image_name }}
+        CI_CONF_PATH: ${{ steps.config.outputs.path }}
+        ALLOW_LARGE_IMAGE: ${{ inputs.allow_large_image }}
+        CONTINUE_ON_FAIL: ${{ inputs.continue_on_fail }}
+        REPORT: ${{ inputs.report }}
+      run: |
+        set -euo pipefail
+        bin="${GITHUB_ACTION_PATH}/compiled/godive-action"
+        chmod +x "$bin"
+        "$bin" "$IMAGE_NAME" "$CI_CONF_PATH" "$ALLOW_LARGE_IMAGE" "$CONTINUE_ON_FAIL" "$REPORT"
+
     - name: Generate Summary
-      if: inputs.summary == 'true'
+      # runs even if the analysis step failed (but not when the job is cancelled)
+      if: ${{ !cancelled() && inputs.summary == 'true' }}
+      shell: bash
+      env:
+        IMAGE_NAME: ${{ inputs.image_name }}
       run: |
         if [[ ! -f /tmp/DIVE_REPORT.md ]]; then
-          echo "❌ DIVE_REPORT.md not found(you may need set report=true).Skipping summary generation." >> $GITHUB_STEP_SUMMARY
+          echo "❌ DIVE_REPORT.md not found (you may need to set report=true). Skipping summary generation." >> "$GITHUB_STEP_SUMMARY"
           exit 0
         fi
         {
           echo ""
           echo "---"
-          echo "## 🧪 Dive analysis result for \`${{ inputs.image_name }}\`"
+          echo "## 🧪 Dive analysis result for \`${IMAGE_NAME}\`"
           echo ""
           echo '```markdown'
           echo " 🐳  Image Info"
-          grep -A 3 '^Analyzing image' /tmp/DIVE_REPORT.md  || echo "No image info found."
+          grep -A 3 '^Analyzing image' /tmp/DIVE_REPORT.md || echo "No image info found."
           echo ""
           echo " 📊 Analysis Summary"
           grep -A 10 '^Results:' /tmp/DIVE_REPORT.md || echo "No results section found."
           echo ""
           echo '```'
-        } >> $GITHUB_STEP_SUMMARY
-      shell: bash
+        } >> "$GITHUB_STEP_SUMMARY"
