@@ -1,6 +1,5 @@
----
 ![repo-logo](assets/images/readme.jpg)
----
+
 ![Action](https://img.shields.io/badge/Action-GitHub-blue?style=for-the-badge)
 ![actual action tag](https://img.shields.io/github/v/tag/dzhunli/godive-action?style=for-the-badge)
 ![License](https://img.shields.io/github/license/dzhunli/godive-action?style=for-the-badge)
